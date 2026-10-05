@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 
 #include "DlssNr_MenuOverlay.h"
 #include "DlssNr_Status.h"
@@ -64,8 +64,8 @@ void RenderNrCompareTags()
 
     // The left side is the untouched frame unless swapped -- matching the shader's
     // showOriginal = (uv.x < split) != swap.
-    const char* leftText = swap ? "DLSS NR : 开" : "DLSS NR : 关";
-    const char* rightText = swap ? "DLSS NR : 关" : "DLSS NR : 开";
+    const char* leftText = swap ? "DLSS NR : ON" : "DLSS NR : OFF";
+    const char* rightText = swap ? "DLSS NR : OFF" : "DLSS NR : ON";
 
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     ImFont* font = ImGui::GetFont();
