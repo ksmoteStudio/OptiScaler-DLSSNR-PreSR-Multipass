@@ -257,6 +257,15 @@ class Config
     // DLSS Neural Rendering: a detail-synthesis pass over the upscaler's output. Off by default -- it is
     // an undocumented feature driven directly through its snippet, not something NVIDIA exposes.
     CustomOptional<bool> DlssNrEnabled { false };
+    // Experimental (2026-10-07): skip HookLateNrQueue, which installs a
+    // process-wide, never-detached detour on o_ExecuteCommandLists and
+    // ID3D12GraphicsCommandList::Reset. Every submission from the game,
+    // Streamline, DLSS-G or anti-cheat then takes nrOwnersMutex plus each
+    // owner's State::mutex. DLSS-G multi-frame generation multiplies the
+    // per-frame submission count, so the global lock hold time grows and the
+    // game's FG queue can starve past the 2s TDR limit. Testing whether that
+    // is the hang source. Default false = current upstream behaviour.
+    CustomOptional<bool> DlssNrNoProcessQueueHook { false };
     // Run the NR pass on the upscaler's colour input, at render resolution, immediately before SR.
     // Off uses post-upscale placement. Default is true (Pre-SR).
     CustomOptional<bool> DlssNrRunBeforeSr { true };

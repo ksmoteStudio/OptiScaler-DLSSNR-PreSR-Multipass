@@ -141,7 +141,7 @@ DlssNr_Dx12::DlssNr_Dx12(std::string InName, ID3D12Device* InDevice)
     }
 
     _init = InitHeaps(InDevice, _frameHeaps, DLSSNR_NUM_OF_HEAPS);
-    if (_init)
+    if (_init && !Config::Instance()->DlssNrNoProcessQueueHook.value_or_default())
         ResTrack_Dx12::HookLateNrQueue(InDevice); // Observe feature-creation submissions too, before the first Run.
     // Codec-only instances never call Dispatch/ProcessSeam, but still record GPU work.
     std::lock_guard lock(nrOwnersMutex);
