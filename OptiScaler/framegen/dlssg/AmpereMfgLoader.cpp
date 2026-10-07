@@ -633,6 +633,21 @@ void TrySetup()
              wstring_to_string(dllPath.wstring()), s_status.ModName, static_cast<uint32_t>(s_status.Variant),
              s_status.HasSm75Support, s_status.Is3101Runtime, s_status.HasDynamicMfgSupport);
 
+    // 2026-10-07: same opt-out as WriteCompanionIni(). That function is only ever
+    // called from the menu, so guarding it alone left this startup path still
+    // rewriting both files -- the switch would have looked like it worked while
+    // changing nothing on the one path that matters.
+    //
+    // Everything from here down writes the SilyNoMeta fork's schema. A different
+    // dlssg_sm86 build reads different keys and treats a missing one as its own
+    // default (v310.9.1-11 defaults MaxInterpolatedFrames to 5 = X6).
+    if (!Config::Instance()->FGDLSSGAmpereMfgWriteCompanionIni.value_or_default())
+    {
+        LOG_INFO("AmpereMfgLoader: companion INI writing disabled by config; "
+                 "keeping the dlssg_sm86.ini this build shipped with");
+        return;
+    }
+
     // Generate and write companion dlssg_sm86.ini beside the DLL
     auto iniPath = dllPath.parent_path() / L"dlssg_sm86.ini";
     try
