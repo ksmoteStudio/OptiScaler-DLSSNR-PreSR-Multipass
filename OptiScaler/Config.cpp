@@ -100,6 +100,16 @@ bool Config::Reload(std::filesystem::path iniPath)
                 FGDLSSGAmpereMfgOptimized.set_from_config(intOpt.value());
             else if (auto boolOpt = readBool("DLSSG", "AmpereMfgOptimized"); boolOpt.has_value())
                 FGDLSSGAmpereMfgOptimized.set_from_config(boolOpt.value() ? 1 : 0);
+
+            // 2026-10-07: out-of-range values fall back to the default rather than
+            // being clamped, matching how AmpereMfgMaxFrames is handled above.
+            if (auto uiRecomp = readInt("DLSSG", "AmpereMfgUiRecomposition"); uiRecomp.has_value() &&
+                uiRecomp.value() >= 0 && uiRecomp.value() <= 2)
+                FGDLSSGAmpereMfgUiRecomposition.set_from_config(uiRecomp.value());
+
+            if (auto writeIni = readBool("DLSSG", "AmpereMfgWriteCompanionIni"); writeIni.has_value())
+                FGDLSSGAmpereMfgWriteCompanionIni.set_from_config(writeIni.value());
+
             if (auto amperePreset = readString("DLSSG", "AmpereMfgPreset"); amperePreset.has_value())
             {
                 if (lstrcmpiA(amperePreset.value().c_str(), "a") == 0)
@@ -1123,6 +1133,10 @@ bool Config::SaveIni(std::filesystem::path destination)
                      GetIntValue(Instance()->FGDLSSGAmpereMfgOptimized.value_for_config()).c_str());
         ini.SetValue("DLSSG", "AmpereMfgPreset",
                      Instance()->FGDLSSGAmpereMfgPreset.value_for_config_or("auto").c_str());
+        ini.SetValue("DLSSG", "AmpereMfgUiRecomposition",
+                     GetIntValue(Instance()->FGDLSSGAmpereMfgUiRecomposition.value_for_config()).c_str());
+        ini.SetValue("DLSSG", "AmpereMfgWriteCompanionIni",
+                     GetBoolValue(Instance()->FGDLSSGAmpereMfgWriteCompanionIni.value_for_config()).c_str());
         ini.SetValue("DLSSG", "AmpereMfgSpoofArchToGame",
                      Instance()->FGDLSSGAmpereMfgSpoofArchToGame.value_for_config_or("auto").c_str());
         ini.SetValue("DLSSG", "AmpereMfgLogLevel",

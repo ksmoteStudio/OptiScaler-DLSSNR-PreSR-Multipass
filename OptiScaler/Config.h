@@ -654,6 +654,21 @@ class Config
     }; // 0.3.2-0.3.5 consistency tiers: 0=stock, 1=bit-identical (recommended default), 2=fast lossy (>50 dB),
        // 3=fastest lossy
     CustomOptional<std::string, NoDefault> FGDLSSGAmpereMfgPreset; // 0.3.0: UI recomposition preset: Auto / A / B
+
+    // 2026-10-07: the preset above never reached ReShade.ini's UIRecomposition key.
+    // Both call sites of MergeReshadeCompanionContent passed four arguments, so
+    // uiRecomposition always fell back to its default of 1 and there was no way to
+    // turn UI recomposition off. This is the real value behind that key.
+    //   0 = follow the game, 1 = automatic (default, unchanged), 2 = force on
+    CustomOptional<int> FGDLSSGAmpereMfgUiRecomposition { 1 };
+
+    // 2026-10-07: OptiScaler rewrites dlssg_sm86.ini and the [DLSSG-SM86-75-COMPANION]
+    // section of ReShade.ini on every launch, in the SilyNoMeta fork's schema. A
+    // different dlssg_sm86 build (e.g. v310.9.1-11) uses MaxInterpolatedFrames and
+    // defaults a missing key to 5, i.e. X6. Turning this off lets an alternative
+    // build keep the INI it shipped with. Default true = today's behaviour.
+    CustomOptional<bool> FGDLSSGAmpereMfgWriteCompanionIni { true };
+
     CustomOptional<std::string, NoDefault>
         FGDLSSGAmpereMfgSpoofArchToGame; // 0.3.3: Streamline/Game arch spoofing: auto / 1 / 0
     CustomOptional<int> FGDLSSGAmpereMfgLogLevel {

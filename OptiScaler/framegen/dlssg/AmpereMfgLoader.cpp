@@ -333,6 +333,20 @@ bool WriteCompanionIni()
     if (dllPathStr.empty())
         return false;
 
+    // 2026-10-07: everything below writes the SilyNoMeta fork's schema
+    // (MaxGeneratedFrames/Optimized/Preset/Router) into dlssg_sm86.ini, then
+    // mirrors part of it into ReShade.ini's companion section. A different
+    // dlssg_sm86 build reads different keys and treats a missing one as its own
+    // default -- v310.9.1-11 defaults MaxInterpolatedFrames to 5, which is X6.
+    // With this off, an alternative build keeps the INI it shipped with and
+    // OptiScaler only sideloads it.
+    if (!Config::Instance()->FGDLSSGAmpereMfgWriteCompanionIni.value_or_default())
+    {
+        LOG_INFO("AmpereMfgLoader: companion INI writing disabled by config; "
+                 "keeping the dlssg_sm86.ini this build shipped with");
+        return false;
+    }
+
     auto iniPath = std::filesystem::path(dllPathStr).parent_path() / L"dlssg_sm86.ini";
     try
     {
@@ -382,7 +396,11 @@ bool WriteCompanionIni()
             ResolveControlModeAndMultiplier(dynamicMfg, explicitOverride, maxCeiling, mode, multiplier);
 
             std::string updatedReshade =
-                MergeReshadeCompanionContent(existingReshade, dynamicMfg, dynamicTargetFps, multiplier);
+                MergeReshadeCompanionContent(existingReshade, dynamicMfg, dynamicTargetFps, multiplier,
+                                             // 2026-10-07: this argument was never passed, so UIRecomposition in
+                                             // ReShade.ini was hard-pinned to 1 and could not be turned off from
+                                             // configuration. AmpereMfgPreset is a different key in a different file.
+                                             Config::Instance()->FGDLSSGAmpereMfgUiRecomposition.value_or_default());
             std::ofstream reshadeOut(reshadeIniPath, std::ios::out | std::ios::trunc);
             if (reshadeOut.is_open())
             {
@@ -657,7 +675,11 @@ void TrySetup()
             ResolveControlModeAndMultiplier(dynamicMfg, explicitOverride, maxCeiling, mode, multiplier);
 
             std::string updatedReshade =
-                MergeReshadeCompanionContent(existingReshade, dynamicMfg, dynamicTargetFps, multiplier);
+                MergeReshadeCompanionContent(existingReshade, dynamicMfg, dynamicTargetFps, multiplier,
+                                             // 2026-10-07: this argument was never passed, so UIRecomposition in
+                                             // ReShade.ini was hard-pinned to 1 and could not be turned off from
+                                             // configuration. AmpereMfgPreset is a different key in a different file.
+                                             Config::Instance()->FGDLSSGAmpereMfgUiRecomposition.value_or_default());
             std::ofstream reshadeOut(reshadeIniPath, std::ios::out | std::ios::trunc);
             if (reshadeOut.is_open())
             {
