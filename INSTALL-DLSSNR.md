@@ -2,7 +2,7 @@
 
 NR is experimental and disabled by default. Do not use injection mods in anti-cheat-protected multiplayer games.
 
-The optional [RTX 40 MFG unlock](docs/RTX40-MFG.md) requires an explicitly enabled build, then its runtime toggle. Standard builds exclude it.
+Multi Frame Generation has two independent unlock paths. The optional [RTX 40 MFG unlock](docs/RTX40-MFG.md) requires an explicitly enabled build, then its runtime toggle; standard builds exclude it. The Ampere/Turing path (`AmpereMfgUnlock` and friends for SM75/SM86, i.e. RTX 20/30) *is* part of the standard build -- see the `AmpereMfg*` keys in `OptiScaler.ini`.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ The optional [RTX 40 MFG unlock](docs/RTX40-MFG.md) requires an explicitly enabl
 - An NVIDIA driver whose installed NGX core supports NR (feature 18).
 - The complete OptiScaler package and a separately supplied `nvngx_dlssnr.dll`.
 
-NR runs inside OptiScaler. No NR helper DLL is required; remove the obsolete `nvngx.dll_dlssnr.dll` when upgrading. Keep the package's ordinary backend dependencies.
+NR runs inside OptiScaler, but the package's `nvngx.dll_dlssnr.dll` forwarder is still required -- do not delete it. The snippet resolves its caller's module via `RtlPcToFileHeader` and rejects any path that does not contain `nvngx.dll` with `FAIL_PlatformError`, before it inspects a single argument, so OptiScaler -- installed as `dxgi.dll` or `winmm.dll` -- fails that check like anything else would. The forwarder exists purely to be named correctly; it forwards create, evaluate and release and does nothing else. See [`forwarder/README.md`](OptiScaler/dlssnr/forwarder/README.md). Keep the package's ordinary backend dependencies.
 
 ### Runtime identification
 
