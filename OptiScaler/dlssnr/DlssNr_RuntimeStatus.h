@@ -97,12 +97,18 @@ namespace DlssNr
             }
         }
 
-        // Points at an internal buffer, valid until the next Mark* call from any
-        // thread. Menu code renders it immediately; do not stash the pointer.
+        // Returns a thread-local snapshot rather than a pointer into the shared
+        // buffer. Returning &_reason under the lock would look safer but is not:
+        // the lock is released on return, so the render thread can overwrite the
+        // buffer while the menu is still formatting it. That is a data race, not
+        // a cosmetic torn string.
         const char* Reason() const
         {
+            static thread_local char snapshot[192];
             std::lock_guard<std::mutex> guard(_reasonMutex);
-            return _reason;
+            std::strncpy(snapshot, _reason, sizeof(snapshot) - 1);
+            snapshot[sizeof(snapshot) - 1] = '\0';
+            return snapshot;
         }
 
       private:

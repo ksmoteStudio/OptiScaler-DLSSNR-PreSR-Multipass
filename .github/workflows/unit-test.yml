@@ -15,12 +15,21 @@ on:
   push:
   workflow_dispatch:
 
+# Without this, a second push queues another full compile-and-run of every
+# test while the first is still going.
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   unit-tests:
     runs-on: windows-latest
+    # 39 tests, each a separate cl.exe invocation. Without a ceiling a wedged
+    # compile holds a runner indefinitely.
+    timeout-minutes: 25
 
     steps:
     - uses: actions/checkout@v6
@@ -29,8 +38,10 @@ jobs:
     # into $env:GITHUB_ENV does not take effect until the NEXT step, so a
     # same-step `Get-Command cl.exe` fails and the job dies before a single
     # test is compiled. That is exactly what the first attempt did.
+    #
+    # Pinned to a full SHA rather than the v1 tag: tags are mutable.
     - name: Set up MSVC environment
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
       with:
         arch: x64
 

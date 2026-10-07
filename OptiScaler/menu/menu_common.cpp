@@ -7836,8 +7836,7 @@ void MenuCommon::RenderKeybindSettings(RenderMenuContext& ctx)
                 break;
             case DlssNr::RuntimeStatus::State::Stalled:
                 ImGui::Text("神经渲染状态: %s", "已开启但未渲染");
-                // Reason() points into a buffer the render thread can overwrite;
-                // ImGui formats it immediately, so read it and let it go.
+                // Reason() hands back a thread-local snapshot, so formatting it here is safe.
                 ImGui::TextDisabled("  原因: %s", nrStatus.Reason());
                 break;
             case DlssNr::RuntimeStatus::State::Off:
