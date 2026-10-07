@@ -19,7 +19,13 @@
 param(
     [string[]] $Required = @('nr_runtime_status_unit'),
     [string]   $OutputDirectory = (Join-Path $env:TEMP 'OptiScaler-unit-tests'),
-    [int]      $TimeoutSeconds = 180
+
+    # msvc  = cl.exe, what CI uses. Authoritative.
+    # clang = clang++ (scoop install llvm). Same tests, seconds instead of
+    #   twenty minutes. Only meaningful for tests that use nothing but the
+    #   standard library; CI stays the gate.
+    [ValidateSet('msvc', 'clang')]
+    [string]   $Compiler = 'msvc'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,18 +33,19 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
-if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
-    throw 'cl.exe not on PATH -- run this from a Visual Studio x64 developer shell.'
+$driver = if ($Compiler -eq 'msvc') { 'cl.exe' } else { 'clang++.exe' }
+if (-not (Get-Command $driver -ErrorAction SilentlyContinue)) {
+    throw "$driver not on PATH. msvc needs a Visual Studio x64 developer shell; clang needs 'scoop install llvm'."
 }
 
 # Include paths shared by the standalone tests. Individual tests that need extra
 # libs (vulkan-1.lib, ole32.lib) declare those in their own run_*.ps1; those
 # wrappers remain the supported path for them.
-$includes = @(
-    "/I$repo\OptiScaler",
-    "/I$repo\external\vulkan\include",
-    "/I$repo\external\nvngx_dlss_sdk",
-    "/I$repo\external\spdlog\include"
+$includeDirs = @(
+    "$repo\OptiScaler",
+    "$repo\external\vulkan\include",
+    "$repo\external\nvngx_dlss_sdk",
+    "$repo\external\spdlog\include"
 )
 
 $results = [System.Collections.Generic.List[object]]::new()
@@ -46,15 +53,24 @@ $results = [System.Collections.Generic.List[object]]::new()
 function Invoke-UnitTest([string] $path) {
     $name = [IO.Path]::GetFileNameWithoutExtension($path)
     $exe = Join-Path $OutputDirectory "$name.exe"
-    $obj = Join-Path $OutputDirectory "$name.obj"
     $stdout = Join-Path $OutputDirectory "$name.out.txt"
 
-    # NOTE: no leading 'cl.exe' in this array. Splatting (@name) is only valid as a
-    # bare argument to a command -- '@compile[1..($compile.Count-1)]' is a parse
-    # error, which is what the first CI run died on.
-    $compileArgs = @('/nologo', '/std:c++20', '/EHsc') + $includes +
-                   @("/Fo$obj", "/Fe$exe", $path)
-    $compileOutput = & cl.exe @compileArgs 2>&1
+    # NOTE: no leading compiler name in these arrays. Splatting (@name) is only
+    # valid as a bare argument to a command -- '@compile[1..($compile.Count-1)]'
+    # is a parse error, which is what the first CI run died on.
+    if ($Compiler -eq 'msvc') {
+        $obj = Join-Path $OutputDirectory "$name.obj"
+        $compileArgs = @('/nologo', '/std:c++20', '/EHsc') +
+                       ($includeDirs | ForEach-Object { "/I$_" }) +
+                       @("/Fo$obj", "/Fe$exe", $path)
+    }
+    else {
+        $compileArgs = @('-std=c++20', '-O1') +
+                       ($includeDirs | ForEach-Object { "-I$_" }) +
+                       @('-o', $exe, $path)
+    }
+
+    $compileOutput = & $driver @compileArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
         return [pscustomobject]@{ Name = $name; Outcome = 'compile-failed'; Detail = ($compileOutput -join "`n") }
     }
