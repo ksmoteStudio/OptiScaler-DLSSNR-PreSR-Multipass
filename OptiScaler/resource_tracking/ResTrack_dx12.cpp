@@ -1891,6 +1891,30 @@ void ResTrack_Dx12::HookLateNrQueue(ID3D12Device* device)
 {
     static std::mutex hookMutex;
     std::lock_guard<std::mutex> lock(hookMutex);
+
+    // 2026-10-07 (experiment): [DlssNr] NoProcessQueueHook.
+    //
+    // This installs two process-wide, never-detached detours: o_ExecuteCommandLists
+    // (via HookToQueue) and ID3D12GraphicsCommandList::Reset. Every submission the
+    // game makes goes through hkExecuteCommandLists, so adding DLSS-G multiplies the
+    // work per submission and the queue lock is contended from several threads.
+    //
+    // The guard deliberately lives HERE rather than at the call sites. There are five
+    // of them -- the DlssNr_Dx12 ctor, DlssNr_Dx12_Run, DlssNr_Dx12_Late,
+    // DlssNr_Late.inl and DlssNr_Dx12_Hold -- and all but the ctor run during normal
+    // per-frame operation. A guard on the ctor alone would still install the detour on
+    // the first real frame, so the experiment would silently measure nothing.
+    if (Config::Instance()->DlssNrNoProcessQueueHook.value_or_default())
+    {
+        static bool warned = false;
+        if (!warned)
+        {
+            warned = true;
+            LOG_INFO("[DlssNr] NoProcessQueueHook=1: late NR queue hook NOT installed");
+        }
+        return;
+    }
+
     HookToQueue(device);
     if (o_LateReset)
         return;

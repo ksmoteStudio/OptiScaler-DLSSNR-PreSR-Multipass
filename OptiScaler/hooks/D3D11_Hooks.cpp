@@ -221,7 +221,7 @@ static HRESULT hkD3D11CreateDevice(IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE Drive
         {
             LOG_INFO("Skipping D3D11 create for anti-cheat caller: {}", caller);
             return o_D3D11CreateDevice(pAdapter, DriverType, Software, Flags, pFeatureLevels, FeatureLevels,
-                                       SDKVersion, ppDevice, ppFeatureLevel, ppImmediateContext);
+                                       SDKVersion, ppDevice, pFeatureLevel, ppImmediateContext);
         }
     }
 
