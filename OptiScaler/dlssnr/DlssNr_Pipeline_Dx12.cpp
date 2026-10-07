@@ -5,6 +5,7 @@
 #include <State.h>
 #include <shaders/dlssnr/DlssNr_Dx12.h>
 #include <shaders/dlssnr/DlssNr_ActiveColor.h>
+#include <dlssnr/DlssNr_RuntimeStatus.h>
 
 namespace
 {
