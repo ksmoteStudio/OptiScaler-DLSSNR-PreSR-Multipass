@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include <dlssnr/DlssNr_StreamlinePicture.h>
+#include <dlssnr/DlssNr_RuntimeStatus.h>
 #include "DlssNr_Dx12_State.h"
 #include <atomic>
 #include <list>
@@ -474,6 +475,12 @@ bool DlssNr_Dx12::CanRender() const { return _init && _state->buffer != nullptr;
 
 void DlssNr_Dx12::ReportPipelineSkip(const char* reason)
 {
+    // 2026-10-07: every NR skip funnels through here -- pre-SR input, dispatch,
+    // spatial fallback, encoder failure, the lot. That makes it the single place
+    // that has to feed the menu's runtime readout; the overlay used to show
+    // Config::DlssNrEnabled alone and so claimed "On" while this ran 30,042 times.
+    DlssNr::GetRuntimeStatus().MarkSkipped(reason);
+
     if (reason == nullptr || _state == nullptr)
         return;
     std::lock_guard ownersLock(nrOwnersMutex);

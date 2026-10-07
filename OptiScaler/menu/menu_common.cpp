@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include <dlssnr/DlssNr_MenuOverlay.h>
+#include <dlssnr/DlssNr_RuntimeStatus.h>
 #include "menu_common.h"
 #include "menu_viewport.h"
 #if defined(OPTISCALER_RTX40_MFG)
@@ -1524,7 +1525,28 @@ void MenuCommon::HandleMenuShortcuts(RenderMenuContext& ctx)
 
             ImGuiToast toast { ImGuiToastType::Info, 2000 };
             toast.setTitle("DLSS 神经渲染");
-            toast.setContent(config->DlssNrEnabled.value_or_default() ? "On" : "Off");
+
+            // 2026-10-07: this used to read config->DlssNrEnabled and print "On".
+            // That answers "was NR requested", not "did NR run" -- on 2026-10-07 it
+            // printed On while the log filled with 30,042 consecutive dispatch
+            // failures. Right after enabling there has been no dispatch yet, so
+            // the honest wording is "waiting for the first frame to confirm", not
+            // "Off" (which would read as broken) and not "On" (which would lie).
+            const bool nrEnabled = config->DlssNrEnabled.value_or_default();
+            auto& nrStatus = DlssNr::GetRuntimeStatus();
+            nrStatus.Configure(nrEnabled);
+            if (!nrEnabled)
+            {
+                toast.setContent("已关闭");
+            }
+            else
+            {
+                const auto state = nrStatus.Current();
+                if (state == DlssNr::RuntimeStatus::State::Stalled)
+                    toast.setContent("已开启 · 未在渲染（上一帧被跳过）");
+                else
+                    toast.setContent("已开启 · 等待渲染确认");
+            }
             ImGui::InsertNotification(toast);
         }
 
@@ -7798,6 +7820,33 @@ void MenuCommon::RenderKeybindSettings(RenderMenuContext& ctx)
         fpsOverlayCycle.Render(config->FpsCycleShortcutKey);
         fgEnable.Render(config->FGShortcutKey);
         dlssNrToggle.Render(config->DlssNrToggleKey);
+
+        // 2026-10-07: a permanent readout of what NR is actually doing. The toast
+        // only lives two seconds, and the hotkey above is the only NR control this
+        // menu has, so without this the user had nowhere to look and had to go
+        // count warnings in a 30 MB log. Configure() is fed here because this is
+        // the consumer: it must track the config the menu just toggled.
+        {
+            auto& nrStatus = DlssNr::GetRuntimeStatus();
+            nrStatus.Configure(config->DlssNrEnabled.value_or_default());
+            switch (nrStatus.Current())
+            {
+            case DlssNr::RuntimeStatus::State::Active:
+                ImGui::Text("神经渲染状态: %s", "运行中");
+                break;
+            case DlssNr::RuntimeStatus::State::Stalled:
+                ImGui::Text("神经渲染状态: %s", "已开启但未渲染");
+                // Reason() points into a buffer the render thread can overwrite;
+                // ImGui formats it immediately, so read it and let it go.
+                ImGui::TextDisabled("  原因: %s", nrStatus.Reason());
+                break;
+            case DlssNr::RuntimeStatus::State::Off:
+            default:
+                ImGui::Text("神经渲染状态: %s",
+                            config->DlssNrEnabled.value_or_default() ? "已开启 · 等待渲染确认" : "未运行");
+                break;
+            }
+        }
     }
 }
 

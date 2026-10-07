@@ -317,7 +317,13 @@ ID3D12Resource* PrepareDlssNrInput(DlssNr_Dx12& shader, ID3D12Device* device, ID
                                       rayReconstruction, submissionEpoch));
     SetupShaderPipeline(pipeline, shader.Buffer());
     if (pipeline.front().inputBuffer != nullptr && DispatchShaderPipeline(pipeline))
+    {
+        // 2026-10-07: the one place the pre-SR NR pass genuinely produced output.
+        // Only this may promote the menu readout to Active -- being configured on
+        // is deliberately not enough, see DlssNr_RuntimeStatus.
+        DlssNr::GetRuntimeStatus().MarkDispatched();
         return shader.Buffer();
+    }
 
     LOG_WARN("DLSS-NR pre-SR input dispatch failed in pipeline");
     shader.ReportPipelineSkip("pre-SR input dispatch failed in pipeline");
