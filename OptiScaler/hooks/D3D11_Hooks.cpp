@@ -20,6 +20,20 @@
 
 bool _skipDx11Create = false;
 
+// 2026-10-07: recognises anti-cheat modules by the caller name from Util::WhoIsTheCaller.
+// Tencent ACE shows up as ACE-Base64.dll; the rest keep the check useful on other titles.
+bool IsAntiCheatModule(const std::string& caller)
+{
+    static const char* const kMarkers[] = { "ACE",   "AntiCheat", "BattlEye", "EAC",
+                                           "EasyAntiCheat", "nProtect", "GameGuard", "XIGNCODE" };
+    for (const auto* marker : kMarkers)
+    {
+        if (caller.find(marker) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
 // DirectX
 using PFN_CreateSamplerState = rewrite_signature<decltype(&ID3D11Device::CreateSamplerState)>::type;
 
@@ -191,6 +205,25 @@ static HRESULT hkD3D11CreateDevice(IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE Drive
     }
 
     LOG_DEBUG("Caller: {}", Util::WhoIsTheCaller(_ReturnAddress()));
+
+    // 2026-10-07: never hijack an anti-cheat D3D11 device.
+    //
+    // Neverness To Everness (UE5 + Tencent ACE) is a D3D12 game, so a D3D11
+    // device is of no use to us. ACE injects ACE-Base64.dll into that same
+    // process and creates its own D3D11 device; this hook then forces its
+    // feature level 11_0 -> 11_1 and calls HookToDeviceLocal on it ("Device
+    // captured"). Handing an anti-cheat a device it did not ask for is the kind
+    // of cross-component interference that precedes a display-engine timeout,
+    // and it buys us nothing. Pass the call straight through instead.
+    {
+        const auto caller = Util::WhoIsTheCaller(_ReturnAddress());
+        if (IsAntiCheatModule(caller))
+        {
+            LOG_INFO("Skipping D3D11 create for anti-cheat caller: {}", caller);
+            return o_D3D11CreateDevice(pAdapter, DriverType, Software, Flags, pFeatureLevels, FeatureLevels,
+                                       SDKVersion, ppDevice, ppFeatureLevel, ppImmediateContext);
+        }
+    }
 
 #ifdef ENABLE_DEBUG_LAYER_DX11
     Flags |= D3D11_CREATE_DEVICE_DEBUG;
