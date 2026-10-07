@@ -1,7 +1,7 @@
 # Compiles and runs the standalone C++ unit tests under tests/.
 #
 # Added 2026-10-07. Until this existed, NO workflow compiled or ran any test:
-# searching every workflow for `cl.exe`, `tests/` or `run_*.ps1` returned zero
+# searching every workflow for `cl.exe`, `tests/` or `run_*.ps1` returns zero
 # hits, and `test.yml` despite its name only did version extraction and
 # nightly-release bookkeeping. Sixty-one test files existed and never executed.
 #
@@ -25,30 +25,21 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    # Must be its own step. A hand-rolled VsDevCmd.bat call that pipes `set`
+    # into $env:GITHUB_ENV does not take effect until the NEXT step, so a
+    # same-step `Get-Command cl.exe` fails and the job dies before a single
+    # test is compiled. That is exactly what the first attempt did.
     - name: Set up MSVC environment
-      uses: microsoft/setup-msbuild@v2
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
 
-    - name: Enable the x64 developer command environment
+    - name: Confirm the compiler is reachable
       shell: pwsh
       run: |
-        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-          -latest -products * `
-          -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-          -property installationPath `
-          -format value
-
-        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-               -latest -products * `
-               -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-               -property installationPath
-        if (-not $vs) { throw 'No Visual Studio with the C++ x64 tools was found.' }
-
-        $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
-        if (-not (Test-Path $devcmd)) { throw "VsDevCmd.bat not found at $devcmd" }
-
-        cmd /c "`"$devcmd`" -arch=x64 -host_arch=x64 && set" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-        Write-Output "cl.exe -> $((Get-Command cl.exe).Source)"
+        $cl = (Get-Command cl.exe -ErrorAction Stop).Source
+        Write-Output "cl.exe -> $cl"
+        cl.exe 2>&1 | Select-Object -First 3
 
     - name: Run unit tests
       shell: pwsh
