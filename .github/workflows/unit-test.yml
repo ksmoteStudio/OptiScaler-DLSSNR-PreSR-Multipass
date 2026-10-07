@@ -1,0 +1,55 @@
+# Compiles and runs the standalone C++ unit tests under tests/.
+#
+# Added 2026-10-07. Until this existed, NO workflow compiled or ran any test:
+# searching every workflow for `cl.exe`, `tests/` or `run_*.ps1` returned zero
+# hits, and `test.yml` despite its name only did version extraction and
+# nightly-release bookkeeping. Sixty-one test files existed and never executed.
+#
+# Only the tests named by run_all_unit.ps1's -Required list gate the build. The
+# rest are compiled and run and reported, because turning them on for the first
+# time is exactly how we find out how many are already broken.
+
+name: Unit Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up MSVC environment
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Enable the x64 developer command environment
+      shell: pwsh
+      run: |
+        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+          -latest -products * `
+          -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+          -property installationPath `
+          -format value
+
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+               -latest -products * `
+               -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+               -property installationPath
+        if (-not $vs) { throw 'No Visual Studio with the C++ x64 tools was found.' }
+
+        $devcmd = Join-Path $vs 'Common7\Tools\VsDevCmd.bat'
+        if (-not (Test-Path $devcmd)) { throw "VsDevCmd.bat not found at $devcmd" }
+
+        cmd /c "`"$devcmd`" -arch=x64 -host_arch=x64 && set" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+        Write-Output "cl.exe -> $((Get-Command cl.exe).Source)"
+
+    - name: Run unit tests
+      shell: pwsh
+      run: .\tests\run_all_unit.ps1
