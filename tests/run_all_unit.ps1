@@ -49,9 +49,12 @@ function Invoke-UnitTest([string] $path) {
     $obj = Join-Path $OutputDirectory "$name.obj"
     $stdout = Join-Path $OutputDirectory "$name.out.txt"
 
-    $compile = @('cl.exe', '/nologo', '/std:c++20', '/EHsc') + $includes +
-               @("/Fo$obj", "/Fe$exe", $path)
-    $compileOutput = & cl.exe @compile[1..($compile.Count - 1)] 2>&1
+    # NOTE: no leading 'cl.exe' in this array. Splatting (@name) is only valid as a
+    # bare argument to a command -- '@compile[1..($compile.Count-1)]' is a parse
+    # error, which is what the first CI run died on.
+    $compileArgs = @('/nologo', '/std:c++20', '/EHsc') + $includes +
+                   @("/Fo$obj", "/Fe$exe", $path)
+    $compileOutput = & cl.exe @compileArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
         return [pscustomobject]@{ Name = $name; Outcome = 'compile-failed'; Detail = ($compileOutput -join "`n") }
     }
