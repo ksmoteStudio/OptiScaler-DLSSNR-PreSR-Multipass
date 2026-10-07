@@ -104,18 +104,27 @@ try {
     $missing = @($Required | Where-Object { $_ -notin $results.Name })
     if ($missing.Count -gt 0) {
         Write-Output "[FAIL] Required test(s) never ran: $($missing -join ', ')"
-        return 1
+        $exitCode = 1
+    }
+    else {
+        $requiredFailed = @($requiredResults | Where-Object { $_.Outcome -ne 'passed' })
+        if ($requiredFailed.Count -gt 0) {
+            Write-Output "[FAIL] Required test(s) failed: $(($requiredFailed | ForEach-Object { $_.Name }) -join ', ')"
+            $exitCode = 1
+        }
+        else {
+            Write-Output "[ok] All required test(s) passed."
+            $exitCode = 0
+        }
     }
 
-    $requiredFailed = @($requiredResults | Where-Object { $_.Outcome -ne 'passed' })
-    if ($requiredFailed.Count -gt 0) {
-        Write-Output "[FAIL] Required test(s) failed: $(($requiredFailed | ForEach-Object { $_.Name }) -join ', ')"
-        return 1
-    }
-
-    Write-Output "[ok] All required test(s) passed."
-    return 0
+    # exit, NOT return. A `return N` from a PowerShell script unwinds the script but
+    # leaves the process exit code at 0, so CI reported success on a run whose own
+    # log said "[FAIL] Required test(s) failed". A gate that cannot fail is worse
+    # than no gate at all.
+    $exitCode
 }
 finally {
     Pop-Location
 }
+exit $exitCode
